@@ -1,0 +1,53 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  
+    <meta charset="UTF-8">
+    <title>{% block title %}User Dashboard{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 30px;
+        }
+        .card {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'user_list' %}">User Dashboard</a>
+        <div class="d-flex">
+            <a href="{% url 'user_add' %}" class="btn btn-success">+ Add User</a>
+        </div>
+        <div class="d-flex">
+            <a href="{% url 'chatbot_add' %}" class="btn btn-success">+ Add Response</a>
+        </div>
+        <div class="d-flex">
+            <a href="{% url 'review_list' %}" class="btn btn-primary">Review Requests</a>
+        </div>
+    </div>
+</nav>
+<a href="{% url 'logout' %}" style="color:red;"> Logout</a>
+ 
+<div class="container">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-info mt-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    
+    {% block content %}
+    {% endblock %}
+</div>
+
+</body>
+</html>

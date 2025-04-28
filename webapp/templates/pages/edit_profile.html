@@ -1,0 +1,63 @@
+{% load static %}
+
+<head>
+  <title>Sting <></title>
+  <link rel="stylesheet" href="{% static 'css/editProfile.css' %}">
+  <link rel="icon" type="images/x-icon" href="{% static '/images/bigsting.png'%}">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="top-buttons">
+    <a class="action-btn" href="{% url 'chatbot' %}">
+      <i class="bx bx-arrow-back"></i>
+      <span>Go Back</span>
+    </a>
+  
+    <a class="action-btn" href="{% url 'logout' %}">
+      <i class="bx bx-log-out"></i>
+      <span>Log Out</span>
+    </a>
+  </div>
+
+  <div class="container">
+    <h2>Edit Your Profile</h2>
+
+    <div class="profile-image">
+      <img id="preview-image" src="{{ user.userImage.url|default:'/media/profile_images/default.png' }}" alt="Profile Image">
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      
+      <div class="form-group">
+        <label for="userName">Name</label>
+        <input type="text" name="userName" id="userName" value="{{ user.userName }}" required>
+      </div>
+
+      <div class="form-group">
+        <label for="userImage">Change Profile Image</label>
+        <input type="file" name="userImage" id="userImage" accept="image/*" onchange="previewImage(event)">
+      </div>
+
+      <button type="submit">Save Changes</button>
+    </form>
+  </div>
+
+
+  
+<!------------------------------------------------------------------------------>
+<!--ImagePut.js-->
+<script>
+
+function previewImage(event) {
+  const reader = new FileReader();
+  reader.onload = function() {
+    document.getElementById('preview-image').src = reader.result;
+  };
+  reader.readAsDataURL(event.target.files[0]);
+}
+
+</script>
+<!------------------------------------------------------------------------------>
+</body>
+</html>

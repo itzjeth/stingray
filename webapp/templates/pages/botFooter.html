@@ -1,0 +1,318 @@
+{% load static %}
+<footer>
+
+  
+<link rel="stylesheet" href="{% static 'css/botStyle.css'%}">
+<link rel="stylesheet" href="{% static 'css/typingStyle.css'%}">
+
+<script src="{% static 'javascript/innerBot.js'%}"></script>
+<script src="{% static 'javascript/deleteHistory.js'%}"></script>
+<script src="{% static 'javascript/sideBar.js'%}"></script>
+<script src="{% static 'javascript/closeSidebar.js'%}"></script>
+
+<link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"rel="stylesheet"/>
+
+{% load static %}
+
+
+<!------------------------------------------------------------------------------>
+<!--chatBotWholeMain.js-->
+<script>
+    let currentUtterance = null;  // Store the current speech utterance so we can pause and resume
+    let speechQueue = [];  // Queue to hold chunks of the text
+    let isPaused = false;  // Boolean to track if speech is paused
+
+    // Function to handle sending a message and getting a bot reply using AJAX
+    function getUserResponse() {
+var userText = $('.messageInput').val().trim();
+if (userText === "") return;
+
+// Display user input
+var userHTML = `
+  <p class='userText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
+    <img src="{{ request.session.user_image|default:'/media/profile_images/default.png' }}" alt="" width="45" height="40" style="border-radius: 50%; transform: scale(0.9);">
+    :<span class="typing" style="background-color: var(--incoming-chat-border);padding: 10px; border-radius: 10px;">${userText}</span>
+  </p>
+`;
+$('.messageInput').val("");
+$('#chatbott').append(userHTML);
+$('#chatbot-history').append(userText + "\n\n");
+
+// Show loading animation
+$('#loading').show();
+
+// AJAX call
+$.get('/webapp/getResponse', { userMessage: userText }).done(function(data) {
+  // Hide loading animation
+  $('#loading').hide();
+
+  var returnedMessage = `
+    <p class='botText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
+      <img src="{% static 'images/stingcya2.png' %}" alt="" width="55" height="40" style="border-radius: 50%; transform: scale(0.7);">
+      <span class="typing" style="background-color: var(--incoming-chat-border);  padding: 10px; border-radius: 10px;" >${data}<br></span>
+      <button class="speak-btn" style="background: var(--sidebar-color); color: var(--text-color);">
+        <span class="material-icons">volume_up</span>
+      </button>
+      <button class="pause-btn" style="background: var(--sidebar-color); color: var(--text-color);">
+        <span class="material-icons">pause</span>
+      </button>
+    </p>
+  `;
+  $('#chatbott').append(returnedMessage);
+  document.querySelector(".chat-log").scrollTop = document.querySelector(".chat-log").scrollHeight;
+});
+}
+
+
+    // Function to speak the bot's reply in chunks when the Speak button is clicked
+    function speakReply(replyText) {
+      if (currentUtterance) {
+        // If there's an ongoing speech, cancel it before starting a new one
+        speechSynthesis.cancel();
+      }
+
+      // Split the text into smaller chunks for pausing and resuming
+      speechQueue = splitTextIntoChunks(replyText);
+
+      // Start speaking the first chunk
+      speakNextChunk();
+    }
+
+    // Function to split text into manageable chunks
+    function splitTextIntoChunks(text) {
+      const maxChunkLength = 200; // Maximum length of each chunk
+      let chunks = [];
+      let startIndex = 0;
+
+      while (startIndex < text.length) {
+        let chunk = text.slice(startIndex, startIndex + maxChunkLength);
+        chunks.push(chunk);
+        startIndex += maxChunkLength;
+      }
+
+      return chunks;
+    }
+
+    // Function to speak the next chunk from the queue
+    function speakNextChunk() {
+      if (speechQueue.length === 0) return;  // No more chunks to speak
+
+      const chunk = speechQueue.shift();  // Get the first chunk
+      currentUtterance = new SpeechSynthesisUtterance(chunk);
+      
+      currentUtterance.onend = function() {
+        // Once the chunk finishes, speak the next chunk
+        if (speechQueue.length > 0) {
+          speakNextChunk();
+        }
+      };
+
+      speechSynthesis.speak(currentUtterance);
+    }
+
+    // Event listener for the Send button (using ID)
+    document.getElementById("send-btn").addEventListener("click", function() {
+      getUserResponse();  // Send the user's message and get the bot's response
+    });
+
+    // Submit on Enter key (without Shift)
+    $('.messageInput').keypress(function(e) {
+      if (e.which === 13 && !e.shiftKey) {
+        e.preventDefault(); // Avoid newline
+        getUserResponse();
+      }
+    });
+
+    // Event listener for Speak buttons (when bot responds)
+    $('#chatbott').on('click', '.speak-btn', function() {
+      const messageText = $(this).prev('span').text().replace("Bot: ", "");
+      speakReply(messageText);  // Speak the bot's response
+    });
+
+    // Event listener for Pause button
+    $('#chatbott').on('click', '.pause-btn', function() {
+      if (speechSynthesis.speaking) {
+        speechSynthesis.pause();  // Pause the speech
+        isPaused = true;  // Mark as paused
+      }
+    });
+
+    // Optional: Event listener for Resume button (you can add a resume button if needed)
+    $('#chatbott').on('click', '.resume-btn', function() {
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();  // Resume the speech
+        isPaused = false;  // Mark as not paused
+      }
+    });
+
+    // Optional: Automatically focus on the input field when page loads
+    window.onload = function() {
+      document.querySelector(".user-input").focus();
+    };
+  </script>
+
+
+
+<!------------------------------------------------------------------------------>
+
+
+<!--suggestionQuestion.JS-->
+<script>
+    const suggestionsList = [
+      "How to enroll (Old Student)",
+      "How to enroll (New Student)",
+      "What are the requirements for New students",
+      "What are the requirements for SHS Graduate",
+      "What are the requirements for Transferee",
+      "What are the requirements for Second Course Applicants",
+      "What are the requirements for foreign student",
+      "What is CvSU Mission",
+      "What is CvSU Vision",
+      "What is CvSU Mission and Vision",
+      "What is CvSU Bacoor Quality Policy", 
+      "Who is the current president of CvSU?",
+      "What majors does CvSU Bacoor offers",
+      "Who have authority to suspends classes",
+      "What is Program Accreditation",
+      "What is Academic Load",
+      "Do I need to maintain attendance to pass the school year?",
+      "What is the passing grade of CvSU Bacoor",
+      "What happen in re-enrollment of subjects",
+      "What is Prerequisite Subjects",
+      "What is Leave of Absence",
+      "What is Honorable Dismissal",
+      "What is the Grading System of CvSU Bacoor",
+      "What is the Grade Requirements and Retention",
+      "What is the Process of Phase Out Program",
+      "What is Unit Load",
+      "What is the table of conversion",
+      "What is the valid reason for refunds",
+      "What is the dress code of CvSU Bacoor",
+      "Which day usually is wash day",
+      "Which day usually is uniform day",
+      "What is COR",
+      "How do I get a Certification of Registration",
+      "How long does COR Form valid",
+      "Can COR forms be used as proof of enrollment",
+      "Is COR required to bring",
+      "What is the COG",
+      "How can I request a Certificate of Grades",
+      "Is there an Student ID in CvSU Bacoor",
+      "Why don’t we have our Student IDs yet",
+      "When will the Student IDs be available",
+      "What should I do if I lose my COR before getting my Student ID",
+      "Does CvSU offer free tuition",
+      "What is the meaning of the CvSU logo",
+      "Can i park at anywhere near of CvSU Bacoor",
+      "Can i park at parking area of CvSU Bacoor",
+      "Is there an entrance exam for CvSU Bacoor",
+      "What are important reminder before taking entrance exam for CvSU Bacoor",
+      "How can I shift courses",
+      "What is the minimum and maximum academic load per semester",
+      "How can I get my Student ID",
+      "What happens if I fail a subject",
+      "How many absences are allowed",
+      "Is there a school uniform at CvSU Bacoor",
+      "Are IDs and uniforms strictly required inside the campus",
+      "How do I join student organizations",
+      "How can I appeal a failing grade",
+      "Is there Wi-Fi on campus",
+      "Are there dormitories available at CvSU Bacoor",
+      "Can I bring my vehicle to campus",
+      "Where can I get my Official Receipt for payments",
+      "Can I graduate with academic deficiencies",
+      "When is the CvSU Bacoor Recognition or Graduation ceremony",
+      
+      
+      
+
+      
+      
+    
+      "LAST"
+    ];
+
+    document.querySelectorAll('.search-containers').forEach(container => {
+      const textarea = container.querySelector('.search-box');
+      const suggestBox = container.querySelector('.suggest-box');
+
+      textarea.addEventListener('input', () => {
+        const query = textarea.value.trim().toLowerCase();
+        if (!query) {
+          suggestBox.style.display = 'none';
+          return;
+        }
+
+        const matches = suggestionsList.filter(item =>
+          item.toLowerCase().startsWith(query)
+        );
+
+        if (matches.length > 0) {
+          suggestBox.innerHTML = matches
+            .map(item => `<div class="suggestion-item" style="color: var(--text-color);">${item}</div>`)
+            .join('');
+          suggestBox.style.display = 'block';
+        } else {
+          suggestBox.style.display = 'none';
+        }
+      });
+
+      suggestBox.addEventListener('click', (e) => {
+if (e.target.classList.contains('suggestion-item')) {
+  textarea.value = e.target.textContent;
+  suggestBox.style.display = 'none';
+  getUserResponse(); // Automatically submit on click
+}
+});
+
+      // Hide on click outside
+      document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+          suggestBox.style.display = 'none';
+        }
+      });
+    });
+  </script>
+
+
+
+
+
+
+
+
+
+
+<!--ImageInput.js-->
+<script>
+    
+    const image_input = document.querySelector("#image_input");
+
+image_input.addEventListener("change", function () {
+const reader = new FileReader();
+reader.addEventListener("load", () => {
+const uploaded_image = reader.result;
+document.querySelector("#display_image").style.backgroundImage = `url(${uploaded_image})`;
+});
+reader.readAsDataURL(this.files[0]);
+});
+  
+</script>
+
+
+
+<!------------------------------------------------------------------------------>
+
+
+<!--preloader.js-->
+<script type="text/javascript">
+    var loader = document.getElementById("preloader");
+  
+    window.addEventListener("load", function(){
+      loader.style.display = "none";
+    })
+  </script>
+
+
+<!------------------------------------------------------------------------------>
+</footer>

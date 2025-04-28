@@ -1,0 +1,39 @@
+{% extends 'pages/base.html' %}
+{% block title %}Review List{% endblock %}
+{% block content %}
+<h3>Access Requests</h3>
+
+<form method="get" class="mb-3 d-flex" role="search">
+    <input type="text" name="q" class="form-control me-2" placeholder="Search..." value="{{ request.GET.q }}">
+    <button type="submit" class="btn btn-outline-primary">Search</button>
+</form>
+
+<a href="{% url 'review_add' %}" class="btn btn-primary mb-2">+ New Request</a>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Name</th><th>Email</th><th>Status</th><th>User Status</th><th>Message</th><th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for review in reviews %}
+        <tr>
+            <td>{{ review.user }}</td>
+            <td>{{ review.email }}</td>
+            <td>{{ review.status }}</td>
+            <td>{{ review.user_status }}</td>
+            <td>{{ review.message }}</td>
+            <td>
+                <a href="{% url 'review_edit' review.pk %}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{% url 'review_delete' review.pk %}" class="btn btn-sm btn-danger">Delete</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center">No matching reviews found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
