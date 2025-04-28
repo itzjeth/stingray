@@ -9,7 +9,6 @@ urlpatterns = [
     path('addUser',views.userAdd),
     path('dologin',views.doLogin, name="dologin"),
     path('logout',views.doLogout, name="logout"),
-    path ('getResponse', views.getResponse, name="getResponse"),
     path('getUser/<int:userId>',views.getUser),
     path('edit-profile/', views.edit_profile, name='edit_profile'),
     path('base/', views.user_list, name='base'),

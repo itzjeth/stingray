@@ -18,38 +18,48 @@
 <!------------------------------------------------------------------------------>
 <!--chatBotWholeMain.js-->
 <script>
-    let currentUtterance = null;  // Store the current speech utterance so we can pause and resume
-    let speechQueue = [];  // Queue to hold chunks of the text
-    let isPaused = false;  // Boolean to track if speech is paused
+ let currentUtterance = null;  // Store the current speech utterance to pause/resume
+let speechQueue = [];         // Queue to hold chunks of text
+let isPaused = false;         // Track if speech is paused
 
-    // Function to handle sending a message and getting a bot reply using AJAX
-    function getUserResponse() {
-var userText = $('.messageInput').val().trim();
-if (userText === "") return;
+// Mapping of suggestions to custom bot responses
+const suggestionResponses = {
+  "How do I join student organizations?": 'Joining a student organization at the University is an excellent way to enhance your academic experience... [TRUNCATED FOR BREVITY]',
+  "What is the table of conversion?": 'All units earned in other colleges or universities shall be evaluated... [TRUNCATED]',
+  "Who is the current president of CvSU?": '<img src="https://cvsu.edu.ph/..."> Dr. Ma. Agnes P. Nuestro has been named as the fourth president... [TRUNCATED]',
+  // Add more custom responses here
+};
 
-// Display user input
-var userHTML = `
-  <p class='userText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
-    <img src="{{ request.session.user_image|default:'/media/profile_images/default.png' }}" alt="" width="45" height="40" style="border-radius: 50%; transform: scale(0.9);">
-    :<span class="typing" style="background-color: var(--incoming-chat-border);padding: 10px; border-radius: 10px;">${userText}</span>
-  </p>
-`;
-$('.messageInput').val("");
-$('#chatbott').append(userHTML);
-$('#chatbot-history').append(userText + "\n\n");
+// Function to send a message and get a bot reply
+function getUserResponse() {
+  var userText = $('.messageInput').val().trim();
+  if (userText === "") return;
 
-// Show loading animation
-$('#loading').show();
+  // Display user input
+  var userHTML = `
+    <p class='userText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
+      <img src="{{ request.session.user_image|default:'/media/profile_images/default.png' }}" alt="" width="45" height="40" style="border-radius: 50%; transform: scale(0.9);">
+      :<span class="typing" style="background-color: var(--incoming-chat-border); padding: 10px; border-radius: 10px;">${userText}</span>
+    </p>
+  `;
+  $('.messageInput').val("");
+  $('#chatbott').append(userHTML);
+  $('#chatbot-history').append(userText + "\n\n");
 
-// AJAX call
-$.get('/webapp/getResponse', { userMessage: userText }).done(function(data) {
+  // Show loading animation
+  $('#loading').show();
+
+  // Check for predefined responses
+  const responseText = suggestionResponses[userText] || "I don't know that.";
+
   // Hide loading animation
   $('#loading').hide();
 
+  // Display bot response with Speak and Pause buttons
   var returnedMessage = `
     <p class='botText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
       <img src="{% static 'images/stingcya2.png' %}" alt="" width="55" height="40" style="border-radius: 50%; transform: scale(0.7);">
-      <span class="typing" style="background-color: var(--incoming-chat-border);  padding: 10px; border-radius: 10px;" >${data}<br></span>
+      <span class="typing" style="background-color: var(--incoming-chat-border); padding: 10px; border-radius: 10px;">${responseText}<br></span>
       <button class="speak-btn" style="background: var(--sidebar-color); color: var(--text-color);">
         <span class="material-icons">volume_up</span>
       </button>
@@ -60,219 +70,196 @@ $.get('/webapp/getResponse', { userMessage: userText }).done(function(data) {
   `;
   $('#chatbott').append(returnedMessage);
   document.querySelector(".chat-log").scrollTop = document.querySelector(".chat-log").scrollHeight;
-});
+
+  // Speak the bot's response
+  speakReply(responseText);
 }
 
+// Function to speak a reply with text-to-speech
+function speakReply(replyText) {
+  if (currentUtterance) {
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+  }
 
-    // Function to speak the bot's reply in chunks when the Speak button is clicked
-    function speakReply(replyText) {
-      if (currentUtterance) {
-        // If there's an ongoing speech, cancel it before starting a new one
-        speechSynthesis.cancel();
-      }
+  // Split text into smaller chunks
+  speechQueue = splitTextIntoChunks(replyText);
 
-      // Split the text into smaller chunks for pausing and resuming
-      speechQueue = splitTextIntoChunks(replyText);
+  // Start speaking the first chunk
+  speakNextChunk();
+}
 
-      // Start speaking the first chunk
-      speakNextChunk();
+// Function to split text into manageable chunks
+function splitTextIntoChunks(text) {
+  const maxChunkLength = 200; // Max characters per chunk
+  let chunks = [];
+  let startIndex = 0;
+
+  while (startIndex < text.length) {
+    let chunk = text.slice(startIndex, startIndex + maxChunkLength);
+    chunks.push(chunk);
+    startIndex += maxChunkLength;
+  }
+  return chunks;
+}
+
+// Function to speak the next chunk
+function speakNextChunk() {
+  if (speechQueue.length === 0) return;  // No more chunks
+
+  const chunk = speechQueue.shift();  // Get the next chunk
+  currentUtterance = new SpeechSynthesisUtterance(chunk);
+
+  currentUtterance.onend = function() {
+    if (speechQueue.length > 0) {
+      speakNextChunk(); // Continue with the next chunk
     }
+  };
 
-    // Function to split text into manageable chunks
-    function splitTextIntoChunks(text) {
-      const maxChunkLength = 200; // Maximum length of each chunk
-      let chunks = [];
-      let startIndex = 0;
+  speechSynthesis.speak(currentUtterance);
+}
 
-      while (startIndex < text.length) {
-        let chunk = text.slice(startIndex, startIndex + maxChunkLength);
-        chunks.push(chunk);
-        startIndex += maxChunkLength;
-      }
+// Event listener for Send button
+document.getElementById("send-btn").addEventListener("click", function() {
+  getUserResponse();
+});
 
-      return chunks;
-    }
+// Submit on Enter (no Shift)
+$('.messageInput').keypress(function(e) {
+  if (e.which === 13 && !e.shiftKey) {
+    e.preventDefault();
+    getUserResponse();
+  }
+});
 
-    // Function to speak the next chunk from the queue
-    function speakNextChunk() {
-      if (speechQueue.length === 0) return;  // No more chunks to speak
+// Event listener for Speak button
+$('#chatbott').on('click', '.speak-btn', function() {
+  const messageText = $(this).prev('span').text().replace("Bot: ", "");
+  speakReply(messageText);
+});
 
-      const chunk = speechQueue.shift();  // Get the first chunk
-      currentUtterance = new SpeechSynthesisUtterance(chunk);
-      
-      currentUtterance.onend = function() {
-        // Once the chunk finishes, speak the next chunk
-        if (speechQueue.length > 0) {
-          speakNextChunk();
-        }
-      };
+// Event listener for Pause button
+$('#chatbott').on('click', '.pause-btn', function() {
+  if (speechSynthesis.speaking) {
+    speechSynthesis.pause();
+    isPaused = true;
+  }
+});
 
-      speechSynthesis.speak(currentUtterance);
-    }
+// (Optional) Resume Button Example
+$('#chatbott').on('click', '.resume-btn', function() {
+  if (speechSynthesis.paused) {
+    speechSynthesis.resume();
+    isPaused = false;
+  }
+});
 
-    // Event listener for the Send button (using ID)
-    document.getElementById("send-btn").addEventListener("click", function() {
-      getUserResponse();  // Send the user's message and get the bot's response
-    });
+// Focus on input field when page loads
+window.onload = function() {
+  document.querySelector(".user-input").focus();
+};
 
-    // Submit on Enter key (without Shift)
-    $('.messageInput').keypress(function(e) {
-      if (e.which === 13 && !e.shiftKey) {
-        e.preventDefault(); // Avoid newline
-        getUserResponse();
-      }
-    });
-
-    // Event listener for Speak buttons (when bot responds)
-    $('#chatbott').on('click', '.speak-btn', function() {
-      const messageText = $(this).prev('span').text().replace("Bot: ", "");
-      speakReply(messageText);  // Speak the bot's response
-    });
-
-    // Event listener for Pause button
-    $('#chatbott').on('click', '.pause-btn', function() {
-      if (speechSynthesis.speaking) {
-        speechSynthesis.pause();  // Pause the speech
-        isPaused = true;  // Mark as paused
-      }
-    });
-
-    // Optional: Event listener for Resume button (you can add a resume button if needed)
-    $('#chatbott').on('click', '.resume-btn', function() {
-      if (speechSynthesis.paused) {
-        speechSynthesis.resume();  // Resume the speech
-        isPaused = false;  // Mark as not paused
-      }
-    });
-
-    // Optional: Automatically focus on the input field when page loads
-    window.onload = function() {
-      document.querySelector(".user-input").focus();
-    };
-  </script>
-
-
-
-<!------------------------------------------------------------------------------>
-
+</script>
 
 <!--suggestionQuestion.JS-->
 <script>
-    const suggestionsList = [
-      "How to enroll (Old Student)",
-      "How to enroll (New Student)",
-      "What are the requirements for New students",
-      "What are the requirements for SHS Graduate",
-      "What are the requirements for Transferee",
-      "What are the requirements for Second Course Applicants",
-      "What are the requirements for foreign student",
-      "What is CvSU Mission",
-      "What is CvSU Vision",
-      "What is CvSU Mission and Vision",
-      "What is CvSU Bacoor Quality Policy", 
-      "Who is the current president of CvSU?",
-      "What majors does CvSU Bacoor offers",
-      "Who have authority to suspends classes",
-      "What is Program Accreditation",
-      "What is Academic Load",
-      "Do I need to maintain attendance to pass the school year?",
-      "What is the passing grade of CvSU Bacoor",
-      "What happen in re-enrollment of subjects",
-      "What is Prerequisite Subjects",
-      "What is Leave of Absence",
-      "What is Honorable Dismissal",
-      "What is the Grading System of CvSU Bacoor",
-      "What is the Grade Requirements and Retention",
-      "What is the Process of Phase Out Program",
-      "What is Unit Load",
-      "What is the table of conversion",
-      "What is the valid reason for refunds",
-      "What is the dress code of CvSU Bacoor",
-      "Which day usually is wash day",
-      "Which day usually is uniform day",
-      "What is COR",
-      "How do I get a Certification of Registration",
-      "How long does COR Form valid",
-      "Can COR forms be used as proof of enrollment",
-      "Is COR required to bring",
-      "What is the COG",
-      "How can I request a Certificate of Grades",
-      "Is there an Student ID in CvSU Bacoor",
-      "Why don’t we have our Student IDs yet",
-      "When will the Student IDs be available",
-      "What should I do if I lose my COR before getting my Student ID",
-      "Does CvSU offer free tuition",
-      "What is the meaning of the CvSU logo",
-      "Can i park at anywhere near of CvSU Bacoor",
-      "Can i park at parking area of CvSU Bacoor",
-      "Is there an entrance exam for CvSU Bacoor",
-      "What are important reminder before taking entrance exam for CvSU Bacoor",
-      "How can I shift courses",
-      "What is the minimum and maximum academic load per semester",
-      "How can I get my Student ID",
-      "What happens if I fail a subject",
-      "How many absences are allowed",
-      "Is there a school uniform at CvSU Bacoor",
-      "Are IDs and uniforms strictly required inside the campus",
-      "How do I join student organizations",
-      "How can I appeal a failing grade",
-      "Is there Wi-Fi on campus",
-      "Are there dormitories available at CvSU Bacoor",
-      "Can I bring my vehicle to campus",
-      "Where can I get my Official Receipt for payments",
-      "Can I graduate with academic deficiencies",
-      "When is the CvSU Bacoor Recognition or Graduation ceremony",
-      
-      
-      
-
-      
-      
+  const suggestionsList = [
     
-      "LAST"
-    ];
+    "Who is the current president of CvSU?",
+    "What is the table of conversion?",
+    "How do I join student organizations?",
+  ];
 
-    document.querySelectorAll('.search-containers').forEach(container => {
-      const textarea = container.querySelector('.search-box');
-      const suggestBox = container.querySelector('.suggest-box');
+  // Update the suggestion box to append the selected suggestion in the chat
+  document.querySelectorAll('.search-containers').forEach(container => {
+  const textarea = container.querySelector('.search-box');
+  const suggestBox = container.querySelector('.suggest-box');
 
-      textarea.addEventListener('input', () => {
-        const query = textarea.value.trim().toLowerCase();
-        if (!query) {
-          suggestBox.style.display = 'none';
-          return;
-        }
+  // Mapping suggestions to custom responses
+  const suggestionResponses = {
+     "How do I join student organizations?": 'Joining a student organization at the University is an excellent way to enhance your academic experience, develop new skills, and build a network of peers who share your interests and passions. The process for joining student organizations generally involves several steps, which are designed to help you find the best fit for your personal and academic goals.<br><br>First and foremost, it’s important to research the different student organizations available at the University. These organizations cover a wide range of interests, from academic clubs, leadership groups, and volunteer organizations, to hobby-based, cultural, and sports clubs. Many student organizations host interest meetings or orientation events at the beginning of each semester where you can learn more about their objectives, activities, and membership requirements. These meetings are an excellent opportunity to ask questions and determine if the organization aligns with your interests.<br><br>Once you’ve found an organization that you would like to join, you typically need to fill out a membership application form. This form is often available through the organization’s official social media pages, the Student Affairs Office, or the student organization’s booth during university events like organization fairs. The application may ask for basic personal information, academic standing, and your reasons for wanting to join the group.<br><br>After submitting your application, some organizations may require interviews, entrance exams, or other selection processes to ensure that members are fully committed and capable of contributing to the group’s activities. However, many organizations welcome all students, regardless of experience or background, and simply ask that you attend a few initial meetings or participate in an introductory event before officially becoming a member.<br><br>It’s also essential to remember that active participation is key in student organizations. Once you become a member, you will be expected to attend regular meetings, participate in events, and contribute to projects or activities, depending on the organization’s purpose. Some organizations may also ask for a nominal membership fee to help fund their events, activities, or initiatives, but this fee is generally affordable and goes towards the upkeep of the club’s operations.<br><br>Lastly, it’s important to stay informed about upcoming opportunities to join organizations, especially during Club Week or Student Organization Recruitment events held at the beginning of each semester. Keep an eye on campus bulletin boards, official university websites, and social media accounts for announcements about these events.<br><br>Joining a student organization is an enriching part of university life that offers a chance to meet like-minded individuals, develop valuable skills, and contribute to the campus community. Don’t hesitate to get involved and explore the many opportunities available to you!',
+    "What is the table of conversion?": 'All units earned in other colleges or universities shall be evaluated on the basis of the following table of conversion <br><br><table style="width: 100%; border: 1px solid var(--text-color);; padding: 30px;"><tr><td style="padding: 15px; border-bottom: 1px solid var(--text-color);  padding: 5px;">Grade</td><td style="padding: 15px; border-bottom: 1px solid var(--text-color);  padding: 5px;">Grade</td><td style="padding: 15px; border-bottom: 1px solid var(--text-color); padding: 5px;">Equivalent</td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 1.00 </td><td style="border-bottom: 1px solid var(--text-color);"> 95% </td><td style="border-bottom: 1px solid var(--text-color);"> 1+ or A+ </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 1.25 </td><td style="border-bottom: 1px solid var(--text-color);"> 93% </td><td style="border-bottom: 1px solid var(--text-color);"> 1 or A </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 1.50 </td><td style="border-bottom: 1px solid var(--text-color);"> 90% </td><td style="border-bottom: 1px solid var(--text-color);"> 1- or A- </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 1.75 </td><td style="border-bottom: 1px solid var(--text-color);"> 89% </td><td style="border-bottom: 1px solid var(--text-color);"> 2+ or B+ </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 2.00 </td><td style="border-bottom: 1px solid var(--text-color);"> 85% </td><td style="border-bottom: 1px solid var(--text-color);"> 2 or B </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 2.25 </td><td style="border-bottom: 1px solid var(--text-color);"> 83% </td><td style="border-bottom: 1px solid var(--text-color);"> 2- or B- </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 2.50 </td><td style="border-bottom: 1px solid var(--text-color);"> 80% </td><td style="border-bottom: 1px solid var(--text-color);"> 3+ or C+ </td></tr><tr ><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 2.75 </td><td style="border-bottom: 1px solid var(--text-color);"> 78% </td><td style="border-bottom: 1px solid var(--text-color);"> 3 or C </td></tr><tr><td style="padding: 15px; border-bottom: 1px solid var(--text-color);"> 3.00 </td><td style="border-bottom: 1px solid var(--text-color);"> 75% </td><td style="border-bottom: 1px solid var(--text-color);"> 3- or C- </td></tr></table>',
+    "Who is the current president of CvSU?": '<img src="https://cvsu.edu.ph/wp-content/uploads/2025/01/2-1920x1920.png" style="display: block;margin-left: auto;margin-right: auto; width: 75%;"><br>Dr. Ma. Agnes P. Nuestro has been named as the fourth president of Cavite State University (CvSU).The members of the CvSU Board of Regents elected Dr. Nuestro to become the next president of the University, succeeding Dr. Hernando D. Robles who retired in October 2024. Having served as the University’s Vice President for Academic Affairs, Dr. Nuestro envisions CvSU as a premier global university by 2028.In her presentation during the Public Forum for the Search for the 4th CvSU President, Dr. Nuestro emphasized her administration’s goals centered on IDEAL: Inclusive and Accessible Education, Dynamic and Competitive Research and Innovation, Empowered Communities and Stronger Partnership, Accountable and Client-Centered Governance, and Long-lasting/Sustainable Resource Generation.',
+    // Add more custom responses here
+  };
 
-        const matches = suggestionsList.filter(item =>
-          item.toLowerCase().startsWith(query)
-        );
+  textarea.addEventListener('input', () => {
+    const query = textarea.value.trim().toLowerCase();
+    if (!query) {
+      suggestBox.style.display = 'none';
+      return;
+    }
 
-        if (matches.length > 0) {
-          suggestBox.innerHTML = matches
-            .map(item => `<div class="suggestion-item" style="color: var(--text-color);">${item}</div>`)
-            .join('');
-          suggestBox.style.display = 'block';
-        } else {
-          suggestBox.style.display = 'none';
-        }
-      });
+    const matches = suggestionsList.filter(item =>
+      item.toLowerCase().startsWith(query)
+    );
 
-      suggestBox.addEventListener('click', (e) => {
-if (e.target.classList.contains('suggestion-item')) {
-  textarea.value = e.target.textContent;
-  suggestBox.style.display = 'none';
-  getUserResponse(); // Automatically submit on click
-}
+    if (matches.length > 0) {
+      suggestBox.innerHTML = matches
+        .map(item => `<div class="suggestion-item" style="color: var(--text-color);">${item}</div>`)
+        .join('');
+      suggestBox.style.display = 'block';
+    } else {
+      suggestBox.style.display = 'none';
+    }
+  });
+
+  suggestBox.addEventListener('click', (e) => {
+    if (e.target.classList.contains('suggestion-item')) {
+      const selectedQuestion = e.target.textContent;
+
+      // Set the value of the input field to the selected question
+      textarea.value = '';  // Clear the input area
+
+      suggestBox.style.display = 'none';
+
+      // Display the selected question in the chat
+      var userHTML = `
+        <p class='userText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
+          <img src="{{ request.session.user_image|default:'/media/profile_images/default.png' }}" alt="" width="45" height="40" style="border-radius: 50%; transform: scale(0.9);">
+          :<span class="typing" style="background-color: var(--incoming-chat-border); padding: 10px; border-radius: 10px;">${selectedQuestion}</span>
+        </p>
+      `;
+      $('#chatbott').append(userHTML);
+      $('#chatbot-history').append(selectedQuestion + "\n\n");
+
+      // Get the custom response for the selected suggestion, or default to "I don't know that"
+      const customResponse = suggestionResponses[selectedQuestion] || "This is test server. Any queries will not be entertain";
+
+      // Display the custom response in the chat
+      var returnedMessage = `
+        <p class='botText' style='text-align: justify; text-justify: inter-word; margin-right: auto; margin-left: auto;'>
+          <img src="{% static 'images/stingcya2.png' %}" alt="" width="55" height="40" style="border-radius: 50%; transform: scale(0.7);">
+          <span class="typing" style="background-color: var(--incoming-chat-border); padding: 10px; border-radius: 10px;">${customResponse}<br></span>
+          <button class="speak-btn" style="background: var(--sidebar-color); color: var(--text-color);">
+            <span class="material-icons">volume_up</span>
+          </button>
+          <button class="pause-btn" style="background: var(--sidebar-color); color: var(--text-color);">
+            <span class="material-icons">pause</span>
+          </button>
+        </p>
+      `;
+      $('#chatbott').append(returnedMessage);
+      document.querySelector(".chat-log").scrollTop = document.querySelector(".chat-log").scrollHeight;
+
+      // Optionally, trigger text-to-speech
+      speakReply(customResponse); // If you have the text-to-speech feature
+    }
+  });
+
+  // Hide suggestions when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!container.contains(e.target)) {
+      suggestBox.style.display = 'none';
+    }
+  });
 });
 
-      // Hide on click outside
-      document.addEventListener('click', (e) => {
-        if (!container.contains(e.target)) {
-          suggestBox.style.display = 'none';
-        }
-      });
-    });
-  </script>
+
+
+</script>
+
+   
 
 
 
